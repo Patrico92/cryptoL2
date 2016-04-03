@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -16,6 +14,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Security;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+import java.util.Random;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -46,6 +45,7 @@ public class MyCipher {
     byte[] fileBytes;
     byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     IvParameterSpec ivspec;
+    byte[] secretmsg;
 
     public MyCipher(byte[] fileBytes, String modeOfEncryption, String keystorePath, String keyIdentifier, String password) throws MalformedURLException, KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException, NoSuchPaddingException {
         Security.addProvider(new BouncyCastleProvider());
@@ -84,6 +84,41 @@ public class MyCipher {
 
         cipher.init(Cipher.DECRYPT_MODE, key,ivspec);
         return cipher.doFinal(fileBytes);
+    }
+    
+    public CPAPair CPAround(int roundNumber, byte[] msg) throws KeyStoreException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, UnrecoverableKeyException, IllegalBlockSizeException, BadPaddingException{
+        
+        CPAPair cpaPair = null;
+        
+        if (roundNumber == 1){
+            secretmsg = msg;
+            iv = generateSomeIV();
+            ivspec = new IvParameterSpec(iv);
+            cipher.init(Cipher.ENCRYPT_MODE, keystore.getKey(keyIdentifier, password.toCharArray()),ivspec);
+            cpaPair = new CPAPair(cipher.doFinal(msg), iv);
+        } else if (roundNumber == 2) {
+            iv = increase(iv);
+            ivspec = new IvParameterSpec(iv);
+            cipher.init(Cipher.ENCRYPT_MODE, keystore.getKey(keyIdentifier, password.toCharArray()),ivspec);
+            cpaPair = new CPAPair(cipher.doFinal(msg), iv);
+        }
+        return cpaPair;    
+    }
+
+    private byte[] generateSomeIV() {
+        byte[] ivRandom = new byte[16];
+        Random generator = new Random();
+        
+        generator.nextBytes(ivRandom);
+        return ivRandom;
+    }
+
+    private byte[] increase(byte[] iv) {
+        int changeByte = (int) iv[iv.length-1];
+        changeByte = (byte) changeByte + 1;
+        
+        iv[iv.length - 1] = (byte) changeByte;
+        return iv;
     }
 
 }
